@@ -9,5 +9,6 @@ __timeseries.py - Timeseries object (Datastructure) on which various calculation
 <br>
 live_simualtion.py - live animation of the swarm (can be saved by using savefig = True in the functions statement)<br>
 multiple_simualtions.py - iterate over many simulations with different parameters (e.g. interaction strength) to extract a certain measure (e.g polarization)<br>
-trajectory.py - Plot the trajectories of some agents<br>
+trajectory.py - Plot the trajectories of some agents, e.g. to see turnradii<br>
 video_simulation.py - Creates a video from the timeseries object<br>
+genetic_algorithm.py - starts a genetic algorithm optimization with pyGAD
