@@ -1,6 +1,6 @@
 # Predator Prey Model
 ##  Model to simulate an interaction between predator(s) and a group of prey agents.
-This model only work on python <=3.10, because some calcualtions are done using numba. A detailed explanations of the model theory and the curretn results can be found in [Some title here](PPModel.pdf) 
+This model only work on python <=3.10, because some calcualtions are done using numba. A detailed explanations of the model theory and the curretn results can be found in the [Documentation](PPModel.pdf) 
 ## Important files
 __model.py - Core Code of the Agent-Based Model; contains model class and the agent classes <br>
 __calculations.py - Various Calculations for the Model and Timerseries, optimized with numba <br>
