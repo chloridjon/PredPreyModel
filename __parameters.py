@@ -37,7 +37,7 @@ interaction_pred = "all"
 con_force = calc.preyprey_force
 pred_force = calc.predprey_force
 
-near_predator = "interaction"
+near_predator = "no interaction"
 
 
 # predator parameters

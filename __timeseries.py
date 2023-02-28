@@ -335,3 +335,14 @@ class timeseries():
         d_avg = d_avg/len
 
         return d_avg
+    
+    def average_spatial_compactness(self, sub = 10):
+        len = int(np.ceil(self.length/sub))
+        d_compact = 0
+        for i in range(len):
+            index = sub * i
+            d_x = np.max(self.x_prey[:,index]) - np.min(self.x_prey[:,index])
+            d_y = np.max(self.y_prey[:,index]) - np.min(self.y_prey[:,index])
+            d_compact += np.sqrt(d_x*d_y)
+        d_compact = d_compact/len
+        return d_compact
