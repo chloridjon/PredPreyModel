@@ -5,27 +5,29 @@ import __timeseries as ts
 from importlib import reload
 reload(m)
 reload(calc)
+import __parameters as p
 
 #initialize model
 M = m.model()
 
 #add prey
-M.add_agents(n = 10, from_file = True, heterogene = True)
+M.add_agents(n = 50, from_file = True, heterogene = True)
 M.simulate(10)
 
 #predator parameters
-n_pred = 1
-length = 10
+r_com = M.center_of_mass()
+r = 150
+phi = 0
+r_pred = r_com + np.array([r*np.cos(phi) , r*np.sin(phi)])
+phi_pred = 0
 s_pred = 16
+length = 10
+atk_distance = 300
+mu = 4.98531305
+alpha = 0
+beta = 1.41661166
 
-#add predators
-M.add_agents(r = np.array([300.,300.]), phi = 0, type = "pred", length = length, mu_con_pred = 5, r_con_pred = 100,
-             alpha = np.random.uniform(0,np.pi,10), mu_prey = 0.5, s = s_pred, atk_distance = 200, beta = 0)
+M.add_agents(n=1, type = "pred", r = r_pred, phi = phi_pred, s = s_pred, length = length,
+             atk_distance = atk_distance, mu_prey = mu, alpha = np.random.uniform(0,2*np.pi, 10), beta = beta)
 
-M.add_agents(r = np.array([-300.,-300.]), phi = 0, type = "pred", length = length, mu_con_pred = 5, r_con_pred = 100,
-             alpha = np.random.uniform(0,np.pi,10), mu_prey = 0.5, s = s_pred, atk_distance = 200, beta = 0)
-
-M.add_agents(r = np.array([300.,-300.]), phi = 0, type = "pred", length = length, mu_con_pred = 5, r_con_pred = 100,
-             alpha = np.random.uniform(0,np.pi,10), mu_prey = 0.5, s = s_pred, atk_distance = 200, beta = 0)
-
-M.live_simulation(200, sub = 10, save = True, path = "3predators.mp4")
+M.live_simulation(100, sub = 10, save = False, path = f"Animations/animation_fleeangle_only_test.mp4")

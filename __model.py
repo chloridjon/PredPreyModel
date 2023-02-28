@@ -4,6 +4,7 @@ from importlib import reload
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import matplotlib.style as mplstyle
+from matplotlib.colors import LinearSegmentedColormap
 import __calculations as calc
 reload(calc)
 import __timeseries as ts
@@ -175,7 +176,7 @@ class model():
             if not heterogene:
                 # from homogene file parameters
                 if type == "prey":
-                    for i in range(n):
+                    for i in range(p.n):
                         ind = str(self.n_prey + i + 1)
                         self.agents.append(prey(index = ind, position = r, phi = phi, s = s,
                                                 mu_con = [p.mu_att_con, p.mu_rep_con, p.mu_alg_con],
@@ -185,7 +186,7 @@ class model():
                                                 interaction_con = p.interaction_con, interaction_pred = p.interaction_pred,
                                                 pred_force = p.pred_force, con_force = p.con_force))
                 elif type == "pred":
-                    for i in range(n):
+                    for i in range(p.n):
                         ind = "p" + str(self.n_pred + 1)
                         self.agents.append(pred(index = ind, position = r, phi = phi, s = s, length = p.length,
                                                 alpha = p.alpha, beta = p.beta, atk_distance = p.atk_distance,
@@ -220,7 +221,7 @@ class model():
                         paras[key] = [value]*n
 
                 if type == "prey":
-                    for i in range(n):
+                    for i in range(p.n):
                         ind = str(self.n_prey + i + 1)
                         self.agents.append(prey(index = ind, position = paras["r"][i], phi = paras["phi"][i], s = paras["s"][i],
                                             mu_con = [paras["mu_att_con"][i], paras["mu_rep_con"][i], paras["mu_alg_con"][i]],
@@ -232,7 +233,7 @@ class model():
                                             interaction_con = paras["interaction_con"][i], interaction_pred = paras["interaction_pred"][i],
                                             pred_force = paras["pred_force"][i], con_force = paras["con_force"][i]))
                 elif type == "pred":
-                    for i in range(n):
+                    for i in range(p.n):
                         ind = "p" + str(self.n_pred + i + 1)
                         self.agents.append(pred(index = ind, position = paras["r"][i], phi = paras["phi"][i], s = paras["s"][i],
                                                 length = paras["length"][i], alpha = paras["alpha"][i], beta = paras["beta"][i],
@@ -259,7 +260,7 @@ class model():
         self.pred_positions = [pred.position for pred in self.pred]
         self.tail_positions = [pred.tail_position for pred in self.pred]
         
-    def move_agents(self, t_step, max_atk_time = 1000):
+    def move_agents(self, t_step):
         """
 
         """
@@ -286,12 +287,12 @@ class model():
                     ag.start_point = calc.pred_startpoint(self.prey_positions, self.phis, alpha, ag.atk_distance)
                     d_point = calc.length(ag.position - ag.start_point)
                     attacks = np.array([ag.phase == "attack" for ag in self.agents if ag.type == "pred"])
-                    if d_point < 10 and not attacks.any():
+                    if d_point < p.prepare_point_radius and not attacks.any():
                         ag.phase = "attack"
                 elif ag.phase == "attack":
                     attack_time += 1
                     d_com = calc.length(calc.centerofmass(self.prey_positions) - ag.position)
-                    if (d_com < 10) or (attack_time > max_atk_time):
+                    if (d_com < p.atk_point_radius) or (attack_time > p.max_atk_timesteps):
                         ag.phase = "prepare"
                         attack_time = 0
                         if ag.atk_index < (len(ag.alpha) - 1):
@@ -336,27 +337,77 @@ class model():
         fig = plt.figure()
         ax = plt.axes()
         mplstyle.use('fast')
+
+        #trace configuration
+        trace = p.trace
+        last_x = np.zeros((self.n_prey, trace))
+        last_y = np.zeros((self.n_prey, trace))
+        last_x_pred = np.zeros((self.n_pred, trace))
+        last_y_pred = np.zeros((self.n_pred, trace))
+        alphas  = np.flip(np.linspace(0.01,1,trace))
+        cmap_nointeraction = "binary"
+        cmap_interaction = LinearSegmentedColormap.from_list("cmap_interaction", ["white", "blue"])
+        cmap_pred_attack = LinearSegmentedColormap.from_list("cmap_interaction", ["white", "green"])
+        cmap_pred_prepare = LinearSegmentedColormap.from_list("cmap_interaction", ["white", "red"])
         def animate(i):
             plt.cla()
             #define boundaries
             positions = np.concatenate((self.prey_positions, self.pred_positions, self.tail_positions))
             bounds = calc.plot_boundaries(positions)
-            
+
             #plot agents and voronoi
-            for prey in self.prey:
+            for index, prey in enumerate(self.prey):
                 if prey.pred_interaction == True:
                     ax.quiver(prey.position[0], prey.position[1], np.cos(prey.phi), np.sin(prey.phi), color = "blue")
+                    # trace
+                    if i >= trace:
+                        ax.scatter(last_x[index], last_y[index], s = 1, c = alphas, cmap = cmap_interaction, marker = ".")
+                        last_x[index] = np.roll(last_x[index], 1)
+                        last_y[index] = np.roll(last_y[index], 1)
+                        last_x[index][0] = prey.position[0]
+                        last_y[index][0] = prey.position[1]
+                    else:
+                        last_x[index][-(i+1)] = prey.position[0]
+                        last_y[index][-(i+1)] = prey.position[1]
                 else:
                     ax.quiver(prey.position[0], prey.position[1], np.cos(prey.phi), np.sin(prey.phi))
+                    # trace
+                    if i >= trace:
+                        ax.scatter(last_x[index], last_y[index], s = 1, c = alphas, cmap = cmap_nointeraction, marker = ".")
+                        last_x[index] = np.roll(last_x[index], 1)
+                        last_y[index] = np.roll(last_y[index], 1)
+                        last_x[index][0] = prey.position[0]
+                        last_y[index][0] = prey.position[1]
+                    else:
+                        last_x[index][-(i+1)] = prey.position[0]
+                        last_y[index][-(i+1)] = prey.position[1]
             if self.voronoi and (self.voronoi_object != 0):
                 voronoi_plot_2d(self.voronoi_object, ax = ax, show_points = False, show_vertices = False)
-            for pred in self.pred:
+            for index, pred in enumerate(self.pred):
                 if pred.phase == "prepare":
                     ax.plot([pred.tail_position[0], pred.position[0]], [pred.tail_position[1], pred.position[1]], "r")
                     ax.quiver(pred.position[0], pred.position[1], np.cos(pred.phi), np.sin(pred.phi), color = "red")
+                    if i >= trace:
+                        ax.scatter(last_x_pred[index], last_y_pred[index], s = 1, c = alphas, cmap = cmap_pred_prepare, marker = ".")
+                        last_x_pred[index] = np.roll(last_x_pred[index], 1)
+                        last_y_pred[index] = np.roll(last_y_pred[index], 1)
+                        last_x_pred[index][0] = pred.tail_position[0]
+                        last_y_pred[index][0] = pred.tail_position[1]
+                    else:
+                        last_x_pred[index][-(i+1)] = pred.tail_position[0]
+                        last_y_pred[index][-(i+1)] = pred.tail_position[1]
                 elif pred.phase == "attack":
                     ax.plot([pred.tail_position[0], pred.position[0]], [pred.tail_position[1], pred.position[1]], "g")
                     ax.quiver(pred.position[0], pred.position[1], np.cos(pred.phi), np.sin(pred.phi), color = "green")
+                    if i >= trace:
+                        ax.scatter(last_x_pred[index], last_y_pred[index], s = 1, c = alphas, cmap = cmap_pred_attack, marker = ".")
+                        last_x_pred[index] = np.roll(last_x_pred[index], 1)
+                        last_y_pred[index] = np.roll(last_y_pred[index], 1)
+                        last_x_pred[index][0] = pred.tail_position[0]
+                        last_y_pred[index][0] = pred.tail_position[1]
+                    else:
+                        last_x_pred[index][-(i+1)] = pred.tail_position[0]
+                        last_y_pred[index][-(i+1)] = pred.tail_position[1]
             #customize axes
             ax.set_xlim(bounds[0]-15,bounds[1]+15)
             ax.set_ylim(bounds[2]-15,bounds[3]+15)
@@ -449,14 +500,12 @@ class prey(agent):
         
 
         if self.near_predator == "no interaction":
-            dist_to_preds = pred_positions - self.position
-            d = np.array([calc.length(dist_to_preds[i]) for i in range(len(pred_positions))])
-            if (d > 70).any(): 
-                con_force = self.con_force(self.position, self.phi, positions_con, phis_con, mu_con = self.mu_con.astype("float64"), a_con = self.a_con, r_con = self.r_con, voronoi = True)
+            if self.pred_interaction: 
+                con_force = self.con_force(self.position, self.phi, positions_con, phis_con, mu_con = [0,0,0], a_con = self.a_con, r_con = self.r_con, voronoi = (self.int_function_con == calc.voronoi_interactions))
             else:
-                con_force = self.con_force(self.position, self.phi, positions_con, phis_con, mu_con = [0,0,0], a_con = self.a_con, r_con = self.r_con)
+                con_force = self.con_force(self.position, self.phi, positions_con, phis_con, mu_con = self.mu_con.astype("float64"), a_con = self.a_con, r_con = self.r_con, voronoi = (self.int_function_con == calc.voronoi_interactions))
         else:
-            con_force = self.con_force(self.position, self.phi, positions_con, phis_con, mu_con = self.mu_con.astype("float64"), a_con = self.a_con, r_con = self.r_con)
+            con_force = self.con_force(self.position, self.phi, positions_con, phis_con, mu_con = self.mu_con.astype("float64"), a_con = self.a_con, r_con = self.r_con, voronoi = (self.int_function_con == calc.voronoi_interactions))
 
         #pred forces
         pred_interactions = self.int_function_pred(self.position, pred_positions, tail_positions)
@@ -506,10 +555,10 @@ class pred(agent):
         self.mu_prey = mu_prey
         self.a_prey = a_prey
         self.r_prey = r_prey
-        if len(alpha) > 0:
-            self.alpha = alpha # attack angle
+        if isinstance(alpha, (float, int)):
+            self.alpha = [alpha] # attack angle
         else:
-            self.alpha = [alpha]
+            self.alpha = alpha
         self.beta = beta # offset angle
         self.atk_distance = atk_distance # minimum attack distance to school
         self.start_point = np.array([0,0]) #next start point of attack

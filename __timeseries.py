@@ -20,6 +20,8 @@ from importlib import reload
 import matplotlib.style as mplstyle
 import __calculations as calc
 from scipy.spatial import KDTree
+import __parameters as p
+from matplotlib.colors import LinearSegmentedColormap
 
 
 
@@ -97,25 +99,41 @@ class timeseries():
             self.as_table()
         self.table.to_hdf(path, key = key)
 
-    def plot_trajectories(self, savefig = False, path = "trajectory.pdf"):
+    def plot_trajectories(self, savefig = False, path = "Graphs/trajectory.pdf", show = True):
         fig, ax = plt.subplots()
+        
+        # plot boundaries
+        x_min = np.array([self.x_prey.min(), self.x_head.min(), self.x_tail.min()]).min() - 5
+        x_max = np.array([self.x_prey.max(), self.x_head.max(), self.x_tail.max()]).max() + 5
+        y_min = np.array([self.y_prey.min(), self.y_head.min(), self.y_tail.min()]).min() - 5
+        y_max = np.array([self.y_prey.max(), self.y_head.max(), self.y_tail.max()]).max() + 5
+        x = x_max - x_min
+        y = y_max - y_min
+        if x > y:
+            y_max += (x-y)/2
+            y_min -= (x-y)/2
+        elif x < y:
+            x_max += (y-x)/2
+            x_min -= (y-x)/2
+
         ax.set_aspect("equal")
-        plt.plot(self.x_prey[0], self.y_prey[0], label = "prey")
-        plt.plot(self.x_head[0], self.y_head[0], "--", label = "predator")
-        plt.plot(self.x_prey[0][0], self.y_prey[0][0], "r+", label = "prey start")
-        plt.plot(self.x_head[0][0], self.y_head[0][0], "r^", label = "predator start")
+        ax.set_xlim(x_min, x_max)
+        ax.set_ylim(y_min, y_max)
 
-        T = int(len(self.x_prey[0])/2)
-        D_pred = np.max(self.x_head[0,T:]) - np.min(self.x_head[0,T:])
-        D_prey = np.max(self.x_prey[0,T:]) - np.min(self.x_prey[0,T:])
+        plt.plot(self.x_prey[0], self.y_prey[0], label = "prey", color = "blue")
+        plt.plot(self.x_head[0], self.y_head[0], "--", label = "predator", color = "red")
+        plt.plot(self.x_prey[0][0], self.y_prey[0][0], "b>", label = "prey start")
+        plt.plot(self.x_head[0][0], self.y_head[0][0], "r>", label = "predator start")
+        plt.plot(self.x_prey[0][-1], self.y_prey[0][-1], "bs", label = "prey start")
+        plt.plot(self.x_head[0][-1], self.y_head[0][-1], "rs", label = "predator start")
 
-        plt.legend([f"Prey, turnradius = {np.round(D_prey)}", f"Predator, turnradius = {np.round(D_pred)}", "Prey start", "Predator Start"], loc='lower right', bbox_to_anchor=(1, 0))
+        plt.legend([f"Prey",f"Predator"])
         if savefig:
             plt.savefig(path)
-        plt.show()
+        if show:
+            plt.show()
 
-    def fast_animation(self, path = "test.mp4", sub = 10, see_pred = False):
-        mplstyle.use('fast')
+    def fast_animation(self, path = "Animations/test.mp4", sub = 10, see_pred = False):
         fig, ax = plt.subplots()
 
         u_prey = np.cos(self.phi_prey)
@@ -134,23 +152,37 @@ class timeseries():
             y_min = np.array([self.y_prey.min(), self.y_head.min(), self.y_tail.min()]).min() - 15
             y_max = np.array([self.y_prey.max(), self.y_head.max(), self.y_tail.max()]).max() + 15
 
+        trace = p.trace
+        alphas_prey = list(np.linspace(0.01,1,trace))*self.n_prey
+        alphas_pred = list(np.linspace(0.01,1,trace))*self.n_pred
+        cmap_prey = "binary"
+        cmap_pred = LinearSegmentedColormap.from_list("cmap_interaction", ["white", "red"])
         def update(num):
             num = int(num*sub)
             ax.clear()
             ax.set_xlim(x_min, x_max)
             ax.set_ylim(y_min, y_max)
             ax.set_aspect("equal")
-            ax.quiver(self.x_prey[:,num], self.y_prey[:,num], u_prey[:,num], v_prey[:,num])
+            ax.quiver(self.x_prey[:,num], self.y_prey[:,num], u_prey[:,num], v_prey[:,num]) # plot prey
+            if num-trace > 0:
+                ax.scatter(self.x_prey[:,num-trace:num], self.y_prey[:,num-trace:num], s = 1, c = alphas_prey, cmap = cmap_prey, marker = ".")
+            else:
+                alphas = list(np.linspace(0.01,1,num))*self.n_prey
+                ax.scatter(self.x_prey[:,0:num], self.y_prey[:,0:num], s = 1, c = alphas, cmap = cmap_prey, marker = ".")
+            ax.plot([self.x_tail[:,num], self.x_head[:,num]], [ self.y_tail[:,num], self.y_head[:,num]], "r")
             ax.quiver(self.x_head[:,num], self.y_head[:,num], u_pred[:,num], v_pred[:,num], color = "red")
-            ax.plot(self.x_tail[:,num], self.y_tail[:,num], "r.")
-                
+            if num-trace > 0:
+                ax.scatter(self.x_tail[:,num-trace:num], self.y_tail[:,num-trace:num], s = 1, c = alphas_pred, cmap = cmap_pred, marker = ".")
+            else:
+                alphas = list(np.linspace(0.01,1,num))*self.n_pred
+                ax.scatter(self.x_tail[:,0:num], self.y_tail[:,0:num], s = 1, c = alphas, cmap = cmap_pred, marker = ".") 
         Q_ani = animation.FuncAnimation(fig, update, interval = 1, frames = int(np.ceil(self.length/sub)))
          
 
         FFMpegWriter = animation.writers['ffmpeg']
         frames = int(np.around((1/self.t_step)/sub))
         writer = FFMpegWriter(fps=frames)
-        Q_ani.save(path, writer=writer, dpi=75)
+        Q_ani.save(path, writer=writer)
         plt.show() 
                   
     def transfer_entropy(self, mode = "global", history_length = 2):
@@ -288,4 +320,18 @@ class timeseries():
                 if D[i][j] < 50:
                     int_matrix[i][j] = 1
         return int_matrix
-   
+    
+    def average_deviation(self, sub = 10):
+        len = int(np.ceil(self.length/sub))
+        r_coms = np.zeros((len, 2))
+        for i in range(len):
+            index = sub * i
+            r_coms[i] = np.array([np.mean(self.x_prey[:,index]), np.mean(self.y_prey[:,index])])
+
+        r_com_avg = np.mean(r_coms, axis = 0)
+        d_avg = 0
+        for i in range(len):
+            d_avg += np.linalg.norm(r_com_avg - r_coms[i])
+        d_avg = d_avg/len
+
+        return d_avg

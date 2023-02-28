@@ -7,6 +7,7 @@ import time
 import matplotlib.pyplot as plt
 
 
+
 @jit(nopython = True, fastmath = True)
 def pred_distance(r_pred, positions):
     pos = np.array(positions)
@@ -258,9 +259,9 @@ def preyprey_force(r_i, phi_i, positions, phis, mu_con, a_con, r_con, voronoi = 
 
         #calc forces
         if voronoi:
-            F_att += mu_con[0] * sigmoid(a_con[0], dis, r_con[0]) * r_ij/dis
+            F_att += mu_con[0] * r_ij/dis
             F_rep -= mu_con[1] * sigmoid(a_con[1], dis, r_con[1]) * r_ij/dis
-            F_alg += mu_con[2] * v_ij
+            F_alg += mu_con[2] *sigmoid(a_con[2], dis, r_con[2])* v_ij
         else:
             F_att += mu_con[0] * sigmoid(a_con[0], dis, r_con[0]) * r_ij/dis
             F_rep -= mu_con[1] * sigmoid(a_con[1], dis, r_con[1]) * r_ij/dis
@@ -305,28 +306,32 @@ def pos_force(r_i, start_point, mu, positions):
     F_rep = - mu * sigmoid(-0.5, length(r_comi), r_rep) * r_comi/length(r_comi)
 
     return F_att + F_rep
-
-@jit(nopython = True, fastmath = True)
+    
 def fleeangle_only(r_i, pred_positions, tail_positions, mu_pred, a_pred, r_pred):
-    theta = np.pi/3
+    import __parameters as p
+    theta = p.theta
     F_i = np.array([0.,0.])
 
     if len(pred_positions) > 0:
         for j in range(len(pred_positions)):
-            #pred orientation
-            v_pred = pred_positions[j] - tail_positions[j]
-            phi_pred = np.arctan2(v_pred[1], v_pred[0])
-            
-            #polar angle relative to predator
             r = r_i - pred_positions[j]
-            angle = np.arctan2(r[1], r[0])
-            if 0 < angle < np.pi:
-                fleeangle = theta
+            D = length(r) 
+            if D < r_pred[0]: 
+                v_pred = np.array(pred_positions[j]).astype("float64") - np.array(tail_positions[j]).astype("float64")
+                phi_pred = np.arctan2(v_pred[1], v_pred[0])
+                
+                #polar angle relative to predator
+                phi_r = np.arctan2(r[1], r[0])
+                angle = np.remainder(phi_r - phi_pred, 2*np.pi)
+                if 0 < angle < np.pi:
+                    fleeangle = theta
+                else:
+                    fleeangle = -theta
+                
+                phi = phi_pred + fleeangle
+                F_i += mu_pred[0]*np.array([np.cos(phi), np.sin(phi)])
             else:
-                fleeangle = -theta
-            
-            phi = phi_pred + fleeangle
-            F_i += mu_pred[0]*np.array([np.cos(phi), np.sin(phi)])
+                pass
     else:
         pass
     return F_i
